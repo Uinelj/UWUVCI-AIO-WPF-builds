@@ -30,15 +30,28 @@ jobs:
       - name: Build Release
         run: msbuild "UWUVCI AIO WPF.sln" /p:Configuration=Release /p:Platform="Any CPU" /p:OutputPath="bin\Release" /t:Rebuild /m /p:RunAnalyzersDuringBuild=false /p:SignManifests=false /p:GenerateManifests=false /p:ManifestKeyFile=""
 
-      - name: List Built Files
+      - name: Prepare Release Bundle
         run: |
-          Get-ChildItem -Path "UWUVCI AIO WPF\bin\Release" -Recurse | Select-Object -First 20 FullName
+          # Create a clean output directory
+          $outputDir = "UWUVCI AIO WPF\bin\Release"
+          $bundleDir = "release-bundle"
+          New-Item -ItemType Directory -Force -Path $bundleDir
+          
+          # Copy only essential files (exe, dll, config, and Resources folder)
+          Copy-Item -Path "$outputDir\*.exe" -Destination $bundleDir
+          Copy-Item -Path "$outputDir\*.dll" -Destination $bundleDir
+          Copy-Item -Path "$outputDir\*.config" -Destination $bundleDir
+          Copy-Item -Path "$outputDir\Resources" -Destination $bundleDir -Recurse -ErrorAction SilentlyContinue
+          
+          # List what we're releasing
+          Write-Host "Release bundle contents:"
+          Get-ChildItem -Path $bundleDir -Recurse | Select-Object FullName
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: UWUVCI-AIO-WPF-windows
-          path: UWUVCI AIO WPF/bin/Release/**/*
+          path: release-bundle/**/*
 
   create-release:
     name: Create GitHub Release
@@ -62,7 +75,7 @@ jobs:
             ## UWUVCI-AIO-WPF Release ${{ github.ref_name }}
 
             ### Downloads
-            - **Windows**: Native Windows build (UWUVCI AIO WPF.exe)
+            - **Windows**: UWUVCI AIO WPF.exe (includes all required DLLs)
             - **Linux**: Run the Windows build under Wine (install .NET Framework 4.8 in your Wine prefix)
             - **macOS**: Run the Windows build under Wine/CrossOver (install .NET Framework 4.8 in your Wine prefix)
 
@@ -70,6 +83,11 @@ jobs:
             This application has built-in Wine detection via `MacLinuxHelper.cs`. For the best experience:
             - Use Wine with .NET Framework 4.8 installed
             - Consider using CrossOver or Lutris for easier setup
+            
+            ### Included Files
+            - `UWUVCI AIO WPF.exe` - Main application
+            - `*.dll` - Required dependencies
+            - `UWUVCI AIO WPF.exe.config` - Application configuration
           draft: false
           prerelease: false
           files: release/**/*
