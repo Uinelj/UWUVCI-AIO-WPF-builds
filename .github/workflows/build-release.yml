@@ -58,18 +58,67 @@ jobs:
           name: UWUVCI-AIO-WPF-windows
           path: release-bundle/**/*
 
-  create-release:
-    name: Create GitHub Release
+  package-macos:
+    name: Package macOS DMG
     needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    runs-on: macos-latest
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
           name: UWUVCI-AIO-WPF-windows
+          path: app
+
+      - name: Create DMG
+        run: |
+          # Create app bundle structure for DMG
+          mkdir -p "UWUVCI AIO WPF.app/Contents/MacOS"
+          mkdir -p "UWUVCI AIO WPF.app/Contents/Resources"
+          
+          # Copy all Windows files to the app bundle
+          cp -R app/* "UWUVCI AIO WPF.app/Contents/MacOS/"
+          
+          # Create a README for macOS users
+          cat > "UWUVCI AIO WPF.app/Contents/Resources/ReadMe.txt" << 'EOF'
+          UWUVCI AIO WPF - Wii U Injector
+          
+          This is a Windows .NET Framework application that runs under Wine/CrossOver.
+          
+          To run on macOS:
+          1. Install CrossOver (https://www.codeweavers.com/crossover) or Wine
+          2. Install .NET Framework 4.8 in your Wine/CrossOver bottle
+          3. Run UWUVCI AIO WPF.exe from this folder
+          
+          The application has built-in Wine detection for proper operation.
+          EOF
+          
+          # Create DMG
+          hdiutil create -volname "UWUVCI AIO WPF" -srcfolder "UWUVCI AIO WPF.app" -ov -format UDZO "UWUVCI-AIO-WPF-mac.dmg"
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UWUVCI-AIO-WPF-macos
+          path: UWUVCI-AIO-WPF-mac.dmg
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build, package-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: UWUVCI-AIO-WPF-windows
           path: release
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: UWUVCI-AIO-WPF-macos
+          path: .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -80,21 +129,19 @@ jobs:
             ## UWUVCI-AIO-WPF Release ${{ github.ref_name }}
 
             ### Downloads
-            - **Windows**: UWUVCI AIO WPF.exe (includes all required DLLs)
+            - **Windows**: UWUVCI-AIO-WPF-windows.zip (contains all required files)
+            - **macOS**: UWUVCI-AIO-WPF-mac.dmg (for Wine/CrossOver)
             - **Linux**: Run the Windows build under Wine (install .NET Framework 4.8 in your Wine prefix)
-            - **macOS**: Run the Windows build under Wine/CrossOver (install .NET Framework 4.8 in your Wine prefix)
 
             ### Notes for Linux/macOS Users
             This application has built-in Wine detection via `MacLinuxHelper.cs`. For the best experience:
             - Use Wine with .NET Framework 4.8 installed
+            - On macOS, open the DMG and run the EXE via CrossOver/Wine
             - Consider using CrossOver or Lutris for easier setup
-            
-            ### Included Files
-            - `UWUVCI AIO WPF.exe` - Main application
-            - `*.dll` - Required dependencies
-            - `UWUVCI AIO WPF.exe.config` - Application configuration
           draft: false
           prerelease: false
-          files: release/**/*
+          files: |
+            UWUVCI-AIO-WPF-mac.dmg
+            release/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
