@@ -169,7 +169,9 @@ namespace UWUVCI_AIO_WPF.Models
             Logger.Log($"Writing {codes.Count} cheat codes to {gctFilePath}");
 
             // Write Gecko magic header (must always be first)
-            bw.Write(BitConverter.GetBytes(0x00D0C0DE).Reverse().ToArray());
+            var headerBytes = BitConverter.GetBytes(0x00D0C0DE);
+            Array.Reverse(headerBytes);
+            bw.Write(headerBytes);
 
             // Write all codes
             foreach (var code in codes)
@@ -188,8 +190,10 @@ namespace UWUVCI_AIO_WPF.Models
             }
 
             // Write Gecko magic terminator
-            bw.Write(BitConverter.GetBytes(0xF0000000).Reverse().ToArray());
-            bw.Write(BitConverter.GetBytes(0x00000000).Reverse().ToArray());
+            var terminatorBytes = BitConverter.GetBytes(0xF0000000);
+            Array.Reverse(terminatorBytes);
+            bw.Write(terminatorBytes);
+            bw.Write(BitConverter.GetBytes(0x00000000));
 
             Logger.Log($"GCT file successfully written to {gctFilePath}");
         }

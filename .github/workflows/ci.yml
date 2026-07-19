@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build Check
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v1
+        with:
+          nuget-version: latest
+
+      - name: Restore NuGet Packages
+        run: nuget restore "UWUVCI AIO WPF.sln"
+
+      - name: Build Debug
+        run: msbuild "UWUVCI AIO WPF.sln" /p:Configuration=Debug /p:Platform="Any CPU" /p:OutputPath="bin\Debug" /t:Rebuild /m /p:RunAnalyzersDuringBuild=false /p:SignManifests=false /p:GenerateManifests=false /p:ManifestKeyFile=""
+
+  test:
+    name: Run Tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    needs: build
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore NuGet Packages
+        run: nuget restore "UWUVCI AIO WPF.sln"
+
+      - name: Build Test Project
+        run: msbuild "UWUVCI MSTest\UWUVCI MSTest.csproj" /p:Configuration=Debug /t:Build /m
+
+      - name: Run Tests
+        run: dotnet test "UWUVCI MSTest\UWUVCI MSTest.csproj" --configuration Debug --no-build --logger "trx;LogFileName=test-results.trx"
