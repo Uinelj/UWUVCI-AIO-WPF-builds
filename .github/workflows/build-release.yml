@@ -37,10 +37,15 @@ jobs:
           $bundleDir = "release-bundle"
           New-Item -ItemType Directory -Force -Path $bundleDir
           
-          # Copy only essential files (exe, dll, config, and Resources folder)
-          Copy-Item -Path "$outputDir\*.exe" -Destination $bundleDir
-          Copy-Item -Path "$outputDir\*.dll" -Destination $bundleDir
-          Copy-Item -Path "$outputDir\*.config" -Destination $bundleDir
+          # Copy only essential files (exclude .xml and .pdb documentation/debug files)
+          Get-ChildItem -Path $outputDir -Filter "*.exe" | Copy-Item -Destination $bundleDir
+          Get-ChildItem -Path $outputDir -Include "*.dll" | Where-Object { $_.Extension -eq ".dll" } | Copy-Item -Destination $bundleDir
+          Get-ChildItem -Path $outputDir -Filter "*.config" | Copy-Item -Destination $bundleDir
+          
+          # Remove any XML or PDB files that got copied
+          Remove-Item -Path "$bundleDir\*.xml" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "$bundleDir\*.pdb" -Force -ErrorAction SilentlyContinue
+          
           Copy-Item -Path "$outputDir\Resources" -Destination $bundleDir -Recurse -ErrorAction SilentlyContinue
           
           # List what we're releasing
