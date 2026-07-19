@@ -1,0 +1,77 @@
+name: Build Releases
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v1
+        with:
+          nuget-version: latest
+
+      - name: Restore NuGet Packages
+        run: nuget restore "UWUVCI AIO WPF.sln"
+
+      - name: Build Release
+        run: msbuild "UWUVCI AIO WPF.sln" /p:Configuration=Release /p:Platform="Any CPU" /p:OutputPath="bin\Release" /t:Rebuild /m /p:RunAnalyzersDuringBuild=false /p:SignManifests=false /p:GenerateManifests=false /p:ManifestKeyFile=""
+
+      - name: List Built Files
+        run: |
+          Get-ChildItem -Path "UWUVCI AIO WPF\bin\Release" -Recurse | Select-Object -First 20 FullName
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UWUVCI-AIO-WPF-windows
+          path: UWUVCI AIO WPF/bin/Release/**/*
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: UWUVCI-AIO-WPF-windows
+          path: release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## UWUVCI-AIO-WPF Release ${{ github.ref_name }}
+
+            ### Downloads
+            - **Windows**: Native Windows build (UWUVCI AIO WPF.exe)
+            - **Linux**: Run the Windows build under Wine (install .NET Framework 4.8 in your Wine prefix)
+            - **macOS**: Run the Windows build under Wine/CrossOver (install .NET Framework 4.8 in your Wine prefix)
+
+            ### Notes for Linux/macOS Users
+            This application has built-in Wine detection via `MacLinuxHelper.cs`. For the best experience:
+            - Use Wine with .NET Framework 4.8 installed
+            - Consider using CrossOver or Lutris for easier setup
+          draft: false
+          prerelease: false
+          files: release/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
